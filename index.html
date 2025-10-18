@@ -1,0 +1,100 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <link rel="icon" type="image/svg+xml" href="/assets/images/favicon.ico" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Ginox | Platform</title>
+    <script src="https://accounts.google.com/gsi/client" async defer></script>
+  </head>
+  <body>
+    <div id="root"></div>
+    <script type="module" src="/src/main.jsx"></script>
+
+    <!-- Conditional Tawk.to Live Chat Script -->
+    <script type="text/javascript">
+      // Function to check if we're on support chat page
+      function isSupportChatPage() {
+        return window.location.pathname === '/supportchat' || 
+               window.location.pathname === '/support-chat' ||
+               window.location.hash.includes('supportchat');
+      }
+
+      // Function to initialize Tawk.to
+      function initializeTawk() {
+        if (!isSupportChatPage()) {
+          var Tawk_API = Tawk_API || {}, Tawk_LoadStart = new Date();
+          (function() {
+            var s1 = document.createElement("script"), s0 = document.getElementsByTagName("script")[0];
+            s1.async = true;
+            s1.src = 'https://embed.tawk.to/65a875e28d261e1b5f549d33/1hkd0ovbv';
+            s1.charset = 'UTF-8';
+            s1.setAttribute('crossorigin', '*');
+            s0.parentNode.insertBefore(s1, s0);
+          })();
+        }
+      }
+
+      // Initialize Tawk on page load if not on support chat page
+      document.addEventListener('DOMContentLoaded', function() {
+        initializeTawk();
+      });
+
+      // Listen for route changes (for SPAs)
+      let lastUrl = location.href;
+      new MutationObserver(() => {
+        const url = location.href;
+        if (url !== lastUrl) {
+          lastUrl = url;
+          
+          // If navigated away from support chat, initialize Tawk
+          if (!isSupportChatPage() && !window.Tawk_API) {
+            setTimeout(initializeTawk, 1000);
+          }
+          // If navigated to support chat, hide Tawk
+          else if (isSupportChatPage() && window.Tawk_API && window.Tawk_API.hideWidget) {
+            window.Tawk_API.hideWidget();
+          }
+        }
+      }).observe(document, { subtree: true, childList: true });
+    </script>
+
+    <!-- Conditional Crisp Chat Script (Only loads on support chat page) -->
+    <script type="text/javascript">
+      // Function to initialize Crisp only on support chat page
+      function initializeCrispIfNeeded() {
+        if (isSupportChatPage()) {
+          window.$crisp = [];
+          window.CRISP_WEBSITE_ID = "fbcdbf6c-cde1-4818-baba-6cb287a96c78";
+          
+          // Remove any existing Crisp script
+          const existingScript = document.querySelector('script[src*="client.crisp.chat"]');
+          if (existingScript) {
+            existingScript.remove();
+          }
+          
+          const d = document;
+          const s = d.createElement("script");
+          s.src = "https://client.crisp.chat/l.js";
+          s.async = 1;
+          d.getElementsByTagName("head")[0].appendChild(s);
+        }
+      }
+
+      // Check on page load
+      document.addEventListener('DOMContentLoaded', function() {
+        initializeCrispIfNeeded();
+      });
+
+      // Also listen for route changes for Crisp
+      let lastUrlForCrisp = location.href;
+      new MutationObserver(() => {
+        const url = location.href;
+        if (url !== lastUrlForCrisp) {
+          lastUrlForCrisp = url;
+          initializeCrispIfNeeded();
+        }
+      }).observe(document, { subtree: true, childList: true });
+    </script>
+  </body>
+</html>

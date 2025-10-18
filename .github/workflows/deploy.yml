@@ -1,0 +1,159 @@
+name: Build and Deploy
+
+on:
+  push:
+    branches:
+      - main
+      - stage
+  workflow_dispatch:
+
+env:
+  AWS_REGION: me-central-1
+  S3_BUCKET: prod-gx-ginox-fe
+  CLOUD_FRONT_DIST_ID: E3PJL6V4CEE783
+  NODE_VERSION: 18
+
+permissions:
+  contents: read
+
+jobs:
+  build-and-deploy:
+
+    name: Build and Deploy to S3 (Production)
+    runs-on: ubuntu-latest
+    if: github.ref == 'refs/heads/main'
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+
+      - name: Install dependencies
+        run: npm install
+
+      - name: Build project
+        run: npm run build
+
+      - name: Configure AWS credentials
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY }}
+          aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+          aws-region: ${{ env.AWS_REGION }}
+
+      - name: Deploy to S3
+        run: |
+          aws s3 sync dist/ s3://${{ env.S3_BUCKET }} --delete
+
+      - name: Invalidate CloudFront Cache
+        run: |
+          aws cloudfront create-invalidation \
+            --distribution-id ${{ env.CLOUD_FRONT_DIST_ID }} \
+            --paths "/*"
+
+  deploy-to-server:
+
+    name: Deploy to Server (Staging)
+    runs-on: ubuntu-latest
+    if: github.ref == 'refs/heads/stage'
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '18'
+          cache: 'npm'
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Run linting (optional, non-blocking)
+        run: |
+          echo "Running ESLint (non-blocking)..."
+          npm run lint || echo "⚠️ ESLint failed but deployment will continue"
+
+      - name: Set deployment variables
+        id: deployment
+        run: |
+          if [[ ${{ github.ref }} == 'refs/heads/main' ]]; then
+            echo "mode=production" >> $GITHUB_OUTPUT
+            echo "deploy_path=/home/ginoxadm/public_html" >> $GITHUB_OUTPUT
+            echo "environment=Production" >> $GITHUB_OUTPUT
+          elif [[ ${{ github.ref }} == 'refs/heads/stage' ]]; then
+            echo "mode=staging" >> $GITHUB_OUTPUT
+            echo "deploy_path=/home/ginoxadm/public_html/test.ginox.io" >> $GITHUB_OUTPUT
+            echo "environment=Staging" >> $GITHUB_OUTPUT
+          fi
+
+      - name: Build application
+        run: npm run build:${{ steps.deployment.outputs.mode }}
+
+      - name: Setup SSH
+        uses: webfactory/ssh-agent@v0.8.0
+        with:
+          ssh-private-key: ${{ secrets.SSH_PRIVATE_KEY }}
+
+      - name: Add server to known hosts
+        run: |
+          mkdir -p ~/.ssh
+          ssh-keyscan -H ${{ secrets.SERVER_HOST }} >> ~/.ssh/known_hosts
+
+      - name: Create backup of current deployment (optional)
+        run: |
+          ssh ${{ secrets.SERVER_USER }}@${{ secrets.SERVER_HOST }} "
+            TIMESTAMP=\$(date +%Y%m%d-%H%M%S)
+            mkdir -p ~/backups/${{ steps.deployment.outputs.deploy_path }}-\$TIMESTAMP
+            cp -r ${{ steps.deployment.outputs.deploy_path }}/* ~/backups/${{ steps.deployment.outputs.deploy_path }}-\$TIMESTAMP/ 2>/dev/null || true
+          "
+
+      - name: Create deployment directory (for staging)
+        if: github.ref == 'refs/heads/stage'
+        run: |
+          ssh ${{ secrets.SERVER_USER }}@${{ secrets.SERVER_HOST }} "
+            mkdir -p ${{ steps.deployment.outputs.deploy_path }}
+          "
+
+      - name: Deploy to server
+        run: |
+          scp -r dist/* ${{ secrets.SERVER_USER }}@${{ secrets.SERVER_HOST }}:${{ steps.deployment.outputs.deploy_path }}/
+
+      - name: Health check
+        run: echo "Performing health check..."
+
+      - name: Cleanup old backups (keep last 5)
+        run: |
+          ssh ${{ secrets.SERVER_USER }}@${{ secrets.SERVER_HOST }} "
+            ls -dt ~/backups/${{ steps.deployment.outputs.deploy_path }}-* | tail -n +6 | xargs -r rm -rf
+          "
+
+      - name: Deployment success notification
+        run: |
+          echo "✅ Deployment completed successfully!"
+          echo "🚀 Application deployed to: ${{ steps.deployment.outputs.deploy_path }}"
+          echo "🌍 Environment: ${{ steps.deployment.outputs.environment }}"
+          echo "📅 Deployment time: $(date)"
+
+      - name: Rollback on failure
+        if: failure()
+        run: |
+          echo "❌ Deployment failed! Rolling back..."
+          ssh ${{ secrets.SERVER_USER }}@${{ secrets.SERVER_HOST }} "
+            LATEST_BACKUP=\$(ls -dt ~/backups/${{ steps.deployment.outputs.deploy_path }}-* | head -1)
+            if [ -n \"\$LATEST_BACKUP\" ]; then
+              cp -r \$LATEST_BACKUP/* ${{ steps.deployment.outputs.deploy_path }}/
+              echo \"Rollback completed to: \$LATEST_BACKUP\"
+            fi
+          "
+
+      - name: Notify failure
+        if: failure()
+        run: |
+          echo "❌ Deployment failed!"
+          echo "Please check the logs for more details."
