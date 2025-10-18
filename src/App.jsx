@@ -145,7 +145,7 @@ function App() {
     >
       <Router>
         <Routes>
-          <Route path="/" element={<Dashboard />} />
+          <Route path="/" element={<ProductHome />} />
           <Route path="/cryptobulk" element={<CryptoBlunder1 />} />
           <Route path="/signin" element={<SignIn />} />
           <Route path="/admin-signin" element={<AdminSignIn />} />
@@ -212,10 +212,7 @@ function App() {
                   <Route path="/product-all" element={<ProductAll />} />
 
                   <Route path="/su-invitation" element={<SuInvitation />} />
-                  <Route
-                    path="/sell-customer-vpn"
-                    element={<SellOrCustomervpn />}
-                  />
+                  <Route path="/sell-customer-vpn" element={<SellOrCustomervpn />} />
 
                   {/* VPN Routes */}
                   <Route path="/vpn/sell" element={<SellVpn />} />
