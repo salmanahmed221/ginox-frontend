@@ -145,7 +145,7 @@ function App() {
     >
       <Router>
         <Routes>
-          <Route path="/" element={<ProductHome />} />
+          <Route path="/" element={<Dashboard />} />
           <Route path="/cryptobulk" element={<CryptoBlunder1 />} />
           <Route path="/signin" element={<SignIn />} />
           <Route path="/admin-signin" element={<AdminSignIn />} />
