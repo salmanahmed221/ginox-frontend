@@ -2014,7 +2014,7 @@ const Profile = () => {
 
       <div className="w-full  max-w-[1100px] items-center justify-center px-4  ">
         <div className="relative z-50 w-full ">
-          <div className=" h-[90vh] md:h-[80vh]  px-4 pt-10 pb-5 w-full flex flex-col items-center bg-[#06101A] border border-[#FFFFFF1A]  rounded-3xl text-text_primary relative">
+          <div className="   px-4 pt-10 pb-5 w-full flex flex-col items-center bg-[#06101A] border border-[#FFFFFF1A]  rounded-3xl text-text_primary relative">
             <Header
               title={
                 activeTab === "cards"
